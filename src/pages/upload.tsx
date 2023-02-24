@@ -1,342 +1,262 @@
-import type { GetServerSideProps, NextPage } from "next";
-import { useRouter } from "next/router";
-import { unstable_getServerSession as getServerSession } from "next-auth";
-import { DragEventHandler, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import MainLayout from "../layout/MainLayout";
+import { AiOutlineCloudUpload, AiOutlineUpload } from "react-icons/ai";
 import toast from "react-hot-toast";
-import { BsFillCloudUploadFill } from "react-icons/bs";
-
-import Navbar from "@/components/Layout/Navbar";
-import Meta from "@/components/Shared/Meta";
-import { fetchWithProgress } from "@/utils/fetch";
-
+import axios from "axios";
 import { trpc } from "../utils/trpc";
+import { useRouter } from "next/router";
+import { GetServerSideProps, GetServerSidePropsContext } from "next";
+import { unstable_getServerSession as getServerSession } from "next-auth";
 import { authOptions } from "./api/auth/[...nextauth]";
+import Meta from "../components/Meta";
 
-const Upload: NextPage = () => {
-  const router = useRouter();
+const Upload = () => {
+  const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
 
-  const uploadMutation = trpc.useMutation("video.create");
-
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const [coverImageURL, setCoverImageURL] = useState<string | null>(null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoURL, setVideoURL] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>();
+  const [videoPreview, setVideoPreview] = useState<string | null>();
+  const [title, setTitle] = useState("");
+  const [loading, setLoading] = useState(false);
   const [videoWidth, setVideoWidth] = useState(0);
   const [videoHeight, setVideoHeight] = useState(0);
-  const [inputValue, setInputValue] = useState("");
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFileDragging, setIsFileDragging] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
-    if (uploadMutation.error) {
-      toast.error("Failed to load the video", {
-        position: "bottom-right",
-      });
-    }
-  }, [uploadMutation.error]);
+  const { mutateAsync } = trpc.video.createVideo.useMutation();
 
-  const handleFileChange = (file: File) => {
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = (e.target.files as FileList)[0];
+
+    if (!file) return;
+
     if (!file.type.startsWith("video")) {
-      toast("Only video file is allowed");
-      return;
+      return toast.error("Only accept video files");
     }
 
-    // Max 200MB file size
-    if (file.size > 209715200) {
-      toast("Max 200MB file size");
-      return;
+    if (file.size / 1000000 > 30) {
+      return toast.error("Your file cannot exceed 30MB");
     }
 
-    const url = URL.createObjectURL(file);
+    const preview = URL.createObjectURL(file);
 
     setVideoFile(file);
-    setVideoURL(url);
+    setVideoPreview(preview);
 
     const video = document.createElement("video");
-    video.style.opacity = "0";
-    video.style.width = "0px";
-    video.style.height = "0px";
+    video.setAttribute("src", preview);
+    video.setAttribute("type", "video/mp4");
+    video.addEventListener("loadedmetadata", (e) => {
+      setVideoWidth(video?.videoWidth);
+      setVideoHeight(video?.videoHeight);
 
-    document.body.appendChild(video);
-
-    video.setAttribute("src", url);
-    video.addEventListener("error", (error) => {
-      console.log(error);
-      document.body.removeChild(video);
-      toast.error("Failed to load the video", {
-        position: "bottom-right",
-      });
+      console.log("width", video?.videoWidth);
+      console.log("height", video?.videoHeight);
     });
-
-    video.addEventListener("loadeddata", () => {
-      setTimeout(() => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d")!;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        setVideoWidth(video.videoWidth);
-        setVideoHeight(video.videoHeight);
-
-        ctx.drawImage(video, 0, 0);
-        setCoverImageURL(canvas.toDataURL("image/png"));
-
-        document.body.removeChild(video);
-      }, 300);
-    });
-    video.load();
   };
 
-  const handleUpload = async () => {
-    if (
-      !coverImageURL ||
-      !videoFile ||
-      !videoURL ||
-      !inputValue.trim() ||
-      isLoading
-    )
+  useEffect(() => {
+    return () => {
+      videoPreview && URL.revokeObjectURL(videoPreview);
+    };
+  }, [videoPreview]);
+
+  const handleDiscard = () => {
+    setVideoFile(null);
+    setVideoPreview(null);
+  };
+
+  const handleUploadVideo = async (e: React.ChangeEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!videoFile) {
+      toast.error("You haven't selected any videos yet");
       return;
+    }
 
-    setIsLoading(true);
+    const toastId = toast.loading("Upload....", { position: "top-left" });
 
-    const toastID = toast.loading("Uploading...");
+    setLoading(true);
 
     try {
-      const uploadedVideo = (
-        await fetchWithProgress(
-          "POST",
-          new URL(
-            "/upload?fileName=video.mp4",
-            process.env.NEXT_PUBLIC_UPLOAD_URL!
-          ).href,
-          videoFile,
-          (percentage) => {
-            toast.loading(`Uploading ${percentage}%...`, { id: toastID });
-          }
-        )
-      ).url;
-
-      toast.loading("Uploading cover image...", { id: toastID });
-
-      const coverBlob = await (await fetch(coverImageURL)).blob();
+      const url = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_URL as string;
 
       const formData = new FormData();
-      formData.append("file", coverBlob, "cover.png");
-      formData.append("content", "From webhook");
+      formData.append("file", videoFile);
+      formData.append(
+        "upload_preset",
+        process.env.NEXT_PUBLIC_UPLOAD_KEY as string
+      );
 
-      const uploadedCover = (
-        await (
-          await fetch(process.env.NEXT_PUBLIC_IMAGE_UPLOAD_URL!, {
-            method: "POST",
-            body: formData,
-          })
-        ).json()
-      ).attachments[0].proxy_url;
+      const videoUrl = await axios.post(url, formData, {
+        onUploadProgress: (p) => {
+          const { loaded, total } = p;
+          const percent = Math.floor((loaded * 100) / (total as number));
+          toast.loading(`Upload ${percent}%....`, { id: toastId });
+        },
+      });
 
-      toast.loading("Uploading metadata...", { id: toastID });
-
-      const created = await uploadMutation.mutateAsync({
-        caption: inputValue.trim(),
-        coverURL: uploadedCover,
-        videoURL: uploadedVideo,
-        videoHeight,
+      const res = await mutateAsync({
+        title,
         videoWidth,
+        videoHeight,
+        videoUrl: videoUrl.data?.url,
       });
 
-      toast.dismiss(toastID);
+      setLoading(false);
 
-      setIsLoading(false);
+      toast.dismiss(toastId);
+      toast.success("Upload video success!");
 
-      router.push(`/video/${created.id}`);
+      handleDiscard();
+      setTitle("");
+      router.push(`/video/${res.video.id}`);
     } catch (error) {
-      console.log(error);
-      setIsLoading(false);
-      toast.error("Failed to upload video", {
-        position: "bottom-right",
-        id: toastID,
-      });
+      setLoading(false);
+      toast.dismiss(toastId);
+      toast.error("Something went wrong!");
     }
-  };
-
-  const dragBlur: DragEventHandler<HTMLButtonElement> = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsFileDragging(false);
-  };
-
-  const dragFocus: DragEventHandler<HTMLButtonElement> = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsFileDragging(true);
-  };
-
-  const dropFile = (e: any) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    let files = e.dataTransfer.files;
-
-    if (files.length > 1) {
-      toast("Only one file is allowed");
-    } else {
-      handleFileChange(files[0]);
-    }
-
-    setIsFileDragging(false);
   };
 
   return (
-    <>
-      <Meta title="Upload | TopTop" description="Upload" image="/favicon.png" />
-      <div className="min-h-screen flex flex-col items-stretch">
-        <Navbar />
-        <div className="flex justify-center mx-2 flex-grow bg-gray-1">
-          <div className="w-full max-w-[1000px] p-8 bg-white my-4">
-            <h1 className="text-2xl font-bold">Upload video</h1>
-            <p className="text-gray-400 mt-2">Post a video to your account</p>
+    <MainLayout>
+      <Meta
+        title="Upload new video | Tiktok"
+        description="Upload page from tiktok"
+        image="https://res.cloudinary.com/dhz1uowbg/image/upload/v1670595740/uioexfuepgqqovjzfskk.png"
+      />
+      <div className="w-full rounded-md bg-[#333] p-6 md:mt-5 md:h-[calc(100vh-100px)]">
+        <div>
+          <h1 className="text-[24px] font-bold">Upload video</h1>
+          <p className="text-[16px] font-normal">
+            Post a video to your account
+          </p>
+        </div>
 
-            <div className="flex items-start mt-10 gap-4">
-              {videoURL ? (
-                <video
-                  className="w-[250px] h-[340px] object-contain"
-                  muted
-                  autoPlay
-                  controls
-                  src={videoURL}
-                  playsInline
-                />
-              ) : (
-                <button
-                  onDrop={dropFile}
-                  onDragLeave={dragBlur}
-                  onDragEnter={dragFocus}
-                  onDragOver={dragFocus}
-                  onClick={() => inputRef.current?.click()}
-                  className={`w-[250px] flex-shrink-0 border-2 border-gray-300 rounded-md border-dashed flex flex-col items-center p-8 cursor-pointer hover:border-red-1 transition ${
-                    isFileDragging ? "border-red-1" : ""
-                  }`}
-                >
-                  <BsFillCloudUploadFill className="fill-[#B0B0B4] w-10 h-10" />
-                  <h1 className="font-semibold mt-4 mb-2">
-                    Select video to upload
-                  </h1>
-                  <p className="text-gray-500 text-sm">
-                    Or drag and drop a file
-                  </p>
-
-                  <div className="flex flex-col items-center text-gray-400 my-4 gap-1 text-sm">
-                    <p>MP4 or WebM</p>
-                    <p>Any resolution</p>
-                    <p>Any duration</p>
-                    <p>Less than 200MB</p>
-                  </div>
-
-                  <div className="w-full bg-red-1 text-white p-2">
-                    Select file
-                  </div>
-                </button>
-              )}
-
-              <input
-                ref={inputRef}
-                type="file"
-                hidden
-                className="hidden"
-                accept="video/mp4,video/webm"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    handleFileChange(e.target.files[0]);
-                  }
-                }}
-              />
-
-              <div className="flex-grow">
-                <label className="block font-medium" htmlFor="caption">
-                  Caption
-                </label>
+        <div className="mt-6 flex flex-col items-center md:flex-row">
+          <label
+            htmlFor="videoFileInput"
+            className={`aspect-[16/9] w-full cursor-pointer flex-col items-center justify-center rounded-md border border-dashed md:flex md:aspect-[9/16] md:w-[260px] ${
+              !videoPreview && "p-[35px]"
+            } overflow-hidden text-center hover:border-primary`}
+          >
+            {!videoPreview ? (
+              <div>
                 <input
-                  type="text"
-                  id="caption"
-                  className="p-2 w-full border border-gray-2 mt-1 mb-3 outline-none focus:border-gray-400 transition"
-                  value={inputValue}
-                  onChange={(e) => {
-                    if (!isLoading) setInputValue(e.target.value);
-                  }}
+                  onChange={handleVideoFileChange}
+                  hidden
+                  type="file"
+                  id="videoFileInput"
                 />
+                <div className="hidden md:block">
+                  <div className="flex w-full justify-center">
+                    <AiOutlineCloudUpload fontSize={40} />
+                  </div>
 
-                <p className="font-medium">Cover</p>
-                <div className="p-2 border border-gray-2 h-[170px] mb-2">
-                  {coverImageURL ? (
-                    <img
-                      className="h-full w-auto object-contain"
-                      src={coverImageURL}
-                      alt=""
-                    />
-                  ) : (
-                    <div className="bg-gray-1 h-full w-[100px]"></div>
-                  )}
+                  <div className="mt-6">
+                    <h3 className="text-[16px] font-semibold">
+                      Select video to upload
+                    </h3>
+                    <p className="mt-3 text-[13px] font-normal text-[rgba(255,255,255,0.75)]">
+                      Or drag and drop a file
+                    </p>
+                  </div>
+
+                  <div className="mt-6">
+                    <p className="my-2 text-[13px] font-normal text-[rgba(255,255,255,0.75)]">
+                      MP4 or WebM
+                    </p>
+                    <p className="my-2 text-[13px] font-normal text-[rgba(255,255,255,0.75)]">
+                      720x1280 resolution or higher
+                    </p>
+                    <p className="my-2 text-[13px] font-normal text-[rgba(255,255,255,0.75)]">
+                      Up to 30 minutes
+                    </p>
+                    <p className="my-2 text-[13px] font-normal text-[rgba(255,255,255,0.75)]">
+                      Less than 30 MB
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    disabled={isLoading}
-                    onClick={() => {
-                      if (inputRef.current?.value) inputRef.current.value = "";
-                      setCoverImageURL(null);
-                      setInputValue("");
-                      setVideoFile(null);
-                      setVideoURL(null);
-                    }}
-                    className="py-3 min-w-[170px] border border-gray-2 bg-white hover:bg-gray-100 transition"
-                  >
-                    Discard
-                  </button>
-                  <button
-                    onClick={() => handleUpload()}
-                    disabled={
-                      !inputValue.trim() ||
-                      !videoURL ||
-                      !videoFile ||
-                      !coverImageURL ||
-                      isLoading
-                    }
-                    className={`flex justify-center items-center gap-2 py-3 min-w-[170px] hover:brightness-90 transition text-white bg-red-1 disabled:text-gray-400 disabled:bg-gray-200`}
-                  >
-                    {isLoading && (
-                      <span className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></span>
-                    )}
-                    Post
-                  </button>
+                <label
+                  htmlFor="videoFileInput"
+                  className="block w-full cursor-pointer rounded-[2px] bg-primary px-4 py-2 text-center text-sm font-semibold text-white md:mt-6"
+                >
+                  Select file
+                </label>
+              </div>
+            ) : (
+              <div className="h-full w-full">
+                <video
+                  muted
+                  ref={videoPreviewRef}
+                  className="h-full w-full"
+                  src={videoPreview}
+                  controls
+                  autoPlay
+                />
+              </div>
+            )}
+          </label>
+          <form
+            onSubmit={handleUploadVideo}
+            className="mt-5 w-full flex-1 md:ml-6 md:mt-0"
+          >
+            <div className="mb-6 w-full">
+              <label className="block text-[16px] font-semibold">Title</label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="mt-4 w-full rounded-[4px] border border-[rgba(255,255,255,0.75)] bg-transparent p-2 text-sm text-white"
+              />
+            </div>
+            <div className="mb-6 w-full">
+              <label className="block text-[16px] font-semibold">Cover</label>
+              <div className="mt-4 h-[168px] w-full rounded-[4px] border border-[rgba(255,255,255,0.75)] bg-transparent p-2 text-sm text-white">
+                <div className="flex h-full w-[85px] items-center justify-center rounded-sm bg-[#222]">
+                  <AiOutlineUpload fontSize={20} />
                 </div>
               </div>
             </div>
-          </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                disabled={loading}
+                type="button"
+                onClick={handleDiscard}
+                className="w-full rounded-sm border border-[rgba(255,255,255,0.75)] bg-transparent px-4 py-2 text-sm font-semibold text-white"
+              >
+                Discard
+              </button>
+              <button
+                disabled={loading}
+                className="w-full rounded-sm bg-primary px-4 py-2 text-sm font-semibold text-white"
+              >
+                Upload
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-    </>
+    </MainLayout>
   );
 };
 
-export default Upload;
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext
+) => {
+  const session = await getServerSession(context.req, context.res, authOptions);
 
-export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
-  const session = await getServerSession(req, res, authOptions);
-
-  if (!session?.user) {
+  if (session?.user) {
     return {
-      redirect: {
-        destination: "/sign-in",
-        permanent: true,
-      },
       props: {},
     };
+  } else {
+    return {
+      redirect: {
+        destination: `/sign-in?redirect=/upload`,
+        permanent: false,
+      },
+    };
   }
-
-  return {
-    props: {
-      session,
-    },
-  };
 };
+
+export default Upload;

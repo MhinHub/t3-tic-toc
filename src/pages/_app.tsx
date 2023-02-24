@@ -1,55 +1,23 @@
-import "../styles/globals.css";
-
-import { withTRPC } from "@trpc/next";
-import type { AppType } from "next/dist/shared/lib/utils";
-import Head from "next/head";
+import { type AppType } from "next/app";
+import { type Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
+import { trpc } from "../utils/trpc";
 import NextNProgress from "nextjs-progressbar";
 import { Toaster } from "react-hot-toast";
-import superjson from "superjson";
+import "react-lazy-load-image-component/src/effects/opacity.css";
+import "../styles/globals.css";
 
-import VolumeContextProvider from "@/context/VolumeContext";
-
-import type { AppRouter } from "../server/router";
-
-const MyApp: AppType = ({
+const MyApp: AppType<{ session: Session | null }> = ({
   Component,
   pageProps: { session, ...pageProps },
 }) => {
   return (
-    <>
-      <Head>
-        <link rel="shortcut icon" href="/favicon.png" type="image/x-icon" />
-      </Head>
+    <SessionProvider session={session}>
+      <NextNProgress color="#FF3B5C" options={{ showSpinner: false }} />
+      <Component {...pageProps} />
       <Toaster />
-      <NextNProgress color="#FE2C55" options={{ showSpinner: false }} />
-      <SessionProvider session={session}>
-        <VolumeContextProvider>
-          <Component {...pageProps} />
-        </VolumeContextProvider>
-      </SessionProvider>
-    </>
+    </SessionProvider>
   );
 };
 
-const getBaseUrl = () => {
-  if (typeof window !== "undefined") {
-    return "";
-  }
-  if (process.browser) return "";
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-
-  return `http://localhost:${process.env.PORT ?? 3000}`; // dev SSR should use localhost
-};
-
-export default withTRPC<AppRouter>({
-  config() {
-    const url = `${getBaseUrl()}/api/trpc`;
-
-    return {
-      url,
-      transformer: superjson,
-    };
-  },
-  ssr: false,
-})(MyApp);
+export default trpc.withTRPC(MyApp);

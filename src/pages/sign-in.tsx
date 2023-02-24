@@ -1,101 +1,93 @@
-import type { GetServerSideProps, NextPage } from "next";
-import { useRouter } from "next/router";
-import { unstable_getServerSession as getServerSession } from "next-auth";
+import Link from "next/link";
+import React from "react";
+import Facebook from "../icons/Facebook";
+import Feedback from "../icons/Feedback";
+import Google from "../icons/Google";
+import Logo from "../icons/Logo";
 import { signIn } from "next-auth/react";
-import { useEffect } from "react";
-import toast from "react-hot-toast";
-import { BsFacebook } from "react-icons/bs";
-import { FcGoogle } from "react-icons/fc";
-
-import Navbar from "@/components/Layout/Navbar";
-import Meta from "@/components/Shared/Meta";
-
+import { unstable_getServerSession as getServerSession } from "next-auth";
 import { authOptions } from "./api/auth/[...nextauth]";
+import { GetServerSideProps, GetServerSidePropsContext } from "next";
+import Meta from "../components/Meta";
 
-const SignIn: NextPage = () => {
-  const router = useRouter();
-  const error = router.query.error as string;
+const signInMethods = [
+  {
+    icons: Facebook,
+    content: "Continue with Facebook",
+    provider: "facebook",
+  },
+  {
+    icons: Google,
+    content: "Continue with Google",
+    provider: "google",
+  },
+];
 
-  useEffect(() => {
-    if (error) {
-      const errors: { [key: string]: string } = {
-        Signin: "Try signing with a different account",
-        OAuthSignin: "Try signing with a different account",
-        OAuthCallback: "Try signing with a different account",
-        OAuthCreateAccount: "Try signing with a different account",
-        EmailCreateAccount: "Try signing with a different account",
-        Callback: "Try signing with a different account",
-        OAuthAccountNotLinked: "Email is connected with another provider",
-        EmailSignin: "Check your email address",
-        CredentialsSignin: "Sign in failed. The credentials are incorrect",
-      };
-
-      toast.error(errors[error] || "Unable to sign in", {
-        position: "bottom-right",
-      });
-    }
-  }, [error]);
-
-  const handleSignIn = (provider: string) => {
-    signIn(provider).catch((err) => {
-      console.log(err);
-      toast.error(`Unable to sign in with ${provider}`, {
-        position: "bottom-right",
-      });
-    });
-  };
-
+const SignIn = () => {
   return (
-    <>
-      <Meta title="Log in | TopTop" description="Log in" image="/favicon.png" />
-      <div className="min-h-screen flex flex-col items-stretch">
-        <Navbar />
-        <div className="flex-grow flex flex-col justify-center items-center gap-3">
-          <h1 className="text-3xl text-center font-semibold">
-            Log in to TikTok
-          </h1>
-          <p className="text-center w-[95vw] max-w-[375px] text-sm text-gray-500">
+    <div className="h-screen text-white">
+      <Meta
+        title="SignIn | Tiktok"
+        description="SignIn page from tiktok"
+        image="https://res.cloudinary.com/dhz1uowbg/image/upload/v1670595740/uioexfuepgqqovjzfskk.png"
+      />
+      <div className="flex items-center justify-between p-4">
+        <Link href="/">
+          <Logo />
+        </Link>
+
+        <button className="flex items-center text-sm font-medium text-white hover:underline">
+          <Feedback />{" "}
+          <span className="ml-2 inline-block">Feedback and help</span>
+        </button>
+      </div>
+
+      <div>
+        <div className="mx-auto w-[375px] max-w-[calc(100%-32px)] text-center">
+          <h4 className="my-4 text-[32px] font-bold">Log in to TikTok</h4>
+          <p className="mt-3 mb-[32px] text-[15px] font-normal text-[rgba(255,255,255,0.75)]">
             Manage your account, check notifications, comment on videos, and
             more.
           </p>
-          <button
-            onClick={() => handleSignIn("google")}
-            className="w-[95vw] max-w-[375px] flex justify-center items-center relative border border-gray-200 hover:border-gray-400 transition h-11"
-          >
-            <span>Continue with Google</span>
-            <FcGoogle className="absolute top-1/2 -translate-y-1/2 left-3 w-6 h-6" />
-          </button>
-          <button
-            onClick={() => handleSignIn("facebook")}
-            className="w-[95vw] max-w-[375px] flex justify-center items-center relative border border-gray-200 hover:border-gray-400 transition h-11"
-          >
-            <span>Continue with Facebook</span>
-            <BsFacebook className="absolute top-1/2 -translate-y-1/2 left-3 w-6 h-6 fill-[#0A80EC]" />
-          </button>
+
+          <div>
+            {signInMethods.map((item) => (
+              <button
+                key={item.provider}
+                onClick={() => signIn(item.provider)}
+                className="relative mb-4 flex w-full items-center justify-center border border-gray-600 px-4 py-2.5 last:mb-0"
+              >
+                <div className="absolute left-4 top-[50%] translate-y-[-50%]">
+                  <item.icons />
+                </div>{" "}
+                <span className="text-[15px]">{item.content}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
-export default SignIn;
-
-export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
-  const session = await getServerSession(req, res, authOptions);
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext
+) => {
+  const session = await getServerSession(context.req, context.res, authOptions);
+  const redirect = (context.query?.redirect as string) || "/";
 
   if (session?.user) {
     return {
       redirect: {
-        destination: "/",
         permanent: true,
+        destination: redirect,
       },
+    };
+  } else {
+    return {
       props: {},
     };
   }
-
-  return {
-    props: {
-      session,
-    },
-  };
 };
+
+export default SignIn;

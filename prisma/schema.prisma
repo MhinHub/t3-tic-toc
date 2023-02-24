@@ -2,111 +2,111 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider        = "prisma-client-js"
-    previewFeatures = ["referentialIntegrity", "fullTextSearch", "fullTextIndex"]
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
 }
 
 datasource db {
-    provider             = "mysql"
-    url                  = env("DATABASE_URL")
-    referentialIntegrity = "prisma"
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 // Necessary for Next auth
 model Account {
-    id                String  @id @default(cuid())
-    userId            String
-    type              String
-    provider          String
-    providerAccountId String
-    refresh_token     String? @db.Text
-    access_token      String? @db.Text
-    expires_at        Int?
-    token_type        String?
-    scope             String?
-    id_token          String? @db.Text
-    session_state     String?
-    user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String  @id @default(cuid()) @map("_id")
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? // @db.Text
+  access_token      String? // @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? // @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountId])
 }
 
 model Session {
-    id           String   @id @default(cuid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid()) @map("_id")
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
-    id            String    @id @default(cuid())
-    name          String?
-    email         String?   @unique
-    emailVerified DateTime?
-    image         String?
-    accounts      Account[]
-    sessions      Session[]
-    videos        Video[]
-    likes         Like[]
-    comments      Comment[]
-    followers     Follow[]  @relation("followings")
-    followings    Follow[]  @relation("followers")
+  id            String    @id @default(cuid()) @map("_id")
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  bio           String?
+  video         Video[]
+  likes         Likes[]
+  followers     Follow[]  @relation("followings")
+  followings    Follow[]  @relation("followers")
+  comment       Comment[]
+  checked       Boolean   @default(false)
 
-    @@fulltext([name, email])
+  @@fulltext([name])
 }
 
 model VerificationToken {
-    identifier String
-    token      String   @unique
-    expires    DateTime
+  id         String   @id @default(cuid()) @map("_id")
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
 }
 
-// Main models
 model Video {
-    id          String    @id @default(cuid())
-    caption     String    @db.Text
-    videoURL    String    @db.Text
-    coverURL    String    @db.Text
-    videoWidth  Int
-    videoHeight Int
-    userId      String
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
-    user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-    likes       Like[]
-    comments    Comment[]
+  id        String    @id @default(cuid()) @map("_id")
+  title     String
+  videoUrl  String
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?
+  width     Int
+  height    Int
+  thumnail  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt()
+  likes     Likes[]
+  comment   Comment[]
 
-    @@fulltext([caption])
+  @@fulltext([title])
 }
 
-model Like {
-    videoId String
-    userId  String
-    user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    video   Video  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+model Likes {
+  id String @id @default(cuid()) @map("_id")
 
-    @@id([videoId, userId])
-}
-
-model Comment {
-    id        String   @id @default(cuid())
-    videoId   String
-    userId    String
-    content   String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video   Video?  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  videoId String?
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String?
 }
 
 model Follow {
-    followerId  String
-    followingId String
-    follower    User   @relation("followers", fields: [followerId], references: [id], onDelete: Cascade)
-    following   User   @relation("followings", fields: [followingId], references: [id], onDelete: Cascade)
+  id          String @id @default(cuid()) @map("_id")
+  followerId  String
+  followingId String
+  follower    User   @relation("followers", fields: [followerId], references: [id])
+  following   User   @relation("followings", fields: [followingId], references: [id])
+}
 
-    @@id([followingId, followerId])
+model Comment {
+  id        String   @id @default(cuid()) @map("_id")
+  comment   String
+  video     Video    @relation(fields: [videoId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt()
+  videoId   String
+  userId    String
 }

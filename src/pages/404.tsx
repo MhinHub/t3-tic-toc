@@ -1,25 +1,18 @@
-import type { NextPage } from "next";
-import Link from "next/link";
+import React from "react";
+import Error from "../components/Error";
+import Meta from "../components/Meta";
 
-import Meta from "@/components/Shared/Meta";
-
-const NotFound: NextPage = () => {
+const PageNotFound = () => {
   return (
-    <>
+    <div>
       <Meta
-        title="Not Found | TopTop"
-        description="Not Found"
-        image="/favicon.png"
+        title="Page not found | 404"
+        description="Page not found | 404"
+        image="https://res.cloudinary.com/dhz1uowbg/image/upload/v1670595740/uioexfuepgqqovjzfskk.png"
       />
-
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <h1 className="text-center">The resource could not be found</h1>
-        <Link href="/">
-          <a className="text-pink">Return Home</a>
-        </Link>
-      </div>
-    </>
+      <Error />
+    </div>
   );
 };
 
-export default NotFound;
+export default PageNotFound;

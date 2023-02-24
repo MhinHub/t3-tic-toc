@@ -1,43 +1,33 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import NextAuth, { type NextAuthOptions } from "next-auth";
-import FacebookProvider from "next-auth/providers/facebook";
 import GoogleProvider from "next-auth/providers/google";
-
-import { prisma } from "@/server/db/client";
+import FacebookProvider from "next-auth/providers/facebook";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import { env } from "../../../env/server.mjs";
+import { prisma } from "../../../server/db/client";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_APP_ID!,
-      clientSecret: process.env.FACEBOOK_APP_SECRET!,
-    }),
-  ],
   callbacks: {
-    session: async ({ session, token }) => {
-      if (session?.user) {
-        // @ts-ignore
-        session.user.id = token.uid;
+    session({ session, user }) {
+      if (session.user) {
+        session.user.id = user.id;
       }
       return session;
     },
-    jwt: async ({ user, token }) => {
-      if (user) {
-        token.uid = user.id;
-      }
-      return token;
-    },
   },
-  session: {
-    strategy: "jwt",
-  },
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    GoogleProvider({
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+    }),
+    FacebookProvider({
+      clientId: env.FACEBOOK_CLIENT_ID,
+      clientSecret: env.FACEBOOK_CLIENT_SECRET,
+    }),
+  ],
+  secret: env.NEXTAUTH_SECRET,
   pages: {
     signIn: "/sign-in",
-    error: "/sign-in",
   },
 };
 

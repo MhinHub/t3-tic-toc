@@ -1,43 +1,31 @@
-<h1 align="center" style="font-size: 60px">TikTok Clone</h1>
+# Tiktok Clone
 
-<p align="center"><strong>A fullstack TikTok clone with Nextjs, Prisma, trpc</strong></p>
+A fullstack Tiktok clone with NextJS, Typescript, Prisma, TaiwindCSS, MongoDB, trpc
 
-<p align="center">
-  <img alt="Stars" src="https://badgen.net/github/stars/napthedev/toptop-clone">
-  <img alt="Forks" src="https://badgen.net/github/forks/napthedev/toptop-clone">
-  <img alt="Issues" src="https://badgen.net/github/issues/napthedev/toptop-clone">
-  <img alt="Commits" src="https://badgen.net/github/commits/napthedev/toptop-clone">
-</p>
+Live demo: [https://toptop-app.vercel.app/](https://toptop-app.vercel.app/)
 
-## Live demo
+### Features
 
-Official website: [https://toptop-clone.vercel.app/](https://toptop-clone.vercel.app/)
+- SignIn with Google, Facebook
+- Autoplay video on scroll
+- Like, comment share video
+- Infinite scroll video
+- Customize video player interface
+- Upload video
+- Search video, account by name
+- Following account
+- Following video page
 
-## Main technology used
+### Preview
 
-- The t3 stack: [create.t3.gg](https://create.t3.gg/)
-  - Nextjs
-  - Prisma
-  - trpc
-  - Typescript
-  - Tailwind
-- next-auth
-- react-hot-toast
+![Preview 1](https://res.cloudinary.com/annnn/image/upload/v1670686322/home_page_tiktok_clone_n1zfs4.png)
+![Preview 2](https://res.cloudinary.com/annnn/image/upload/v1670686325/video_page_tiktok_clone_fzplvl.png)
 
-## Features
+### Technology
 
-- Auth (Google, Facebook)
-- Upload video with thumbnail
-- Infinite loading
-- Follow user
-- Following tab
-- Like a video
-- Comment on a video
-- Share video on Facebook, Twitter, Reddit,...
-- User profile
-- Search accounts and videos
-- SEO
-
-## Installation
-
-See [SELF-HOSTING.md](/SELF-HOSTING.md)
+- NextJS
+- Typescript
+- Prisma
+- MongoDB
+- TailwindCSS
+- trpc

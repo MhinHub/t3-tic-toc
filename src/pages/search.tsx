@@ -1,222 +1,128 @@
-import { GetServerSidePropsContext, InferGetServerSidePropsType } from "next";
-import Image from "next/future/image";
-import Link from "next/link";
-import { useRouter } from "next/router";
-import { unstable_getServerSession as getServerSession } from "next-auth";
-import { FC, useState } from "react";
-import { BsPlay } from "react-icons/bs";
+import { GetServerSideProps, GetServerSidePropsContext, NextPage } from "next";
+import React, { useState } from "react";
+import AccountItem from "../components/Account/AccountItem";
+import VideoSmall from "../components/Video/VideoSmall";
+import MainLayout from "../layout/MainLayout";
+import { Account, VideoDefault } from "../types";
+import { prisma } from "../server/db/client";
+import Meta from "../components/Meta";
 
-import Navbar from "@/components/Layout/Navbar";
-import Meta from "@/components/Shared/Meta";
-import { prisma } from "@/server/db/client";
-import { formatAccountName } from "@/utils/text";
-
-import { authOptions } from "./api/auth/[...nextauth]";
-
-enum Tabs {
-  accounts,
-  videos,
+interface SearchProps {
+  videos: VideoDefault[];
+  accounts: Account[];
+  keyword: string;
 }
 
-const Search: FC<SearchProps> = ({ videos, accounts }) => {
-  const [currentTab, setCurrentTab] = useState(Tabs.accounts);
-  const router = useRouter();
+const Search: NextPage<SearchProps> = ({ videos, keyword, accounts }) => {
+  const [searchType, setSearchType] = useState<"videos" | "accounts">("videos");
 
   return (
-    <>
+    <MainLayout>
       <Meta
-        title={`Find '${router.query.q}' on Toptop`}
-        description="TopTop Search"
-        image="/favicon.png"
+        title={`Search results to "${keyword}" | Tiktok`}
+        description="Search page from tiktok"
+        image="https://res.cloudinary.com/dhz1uowbg/image/upload/v1670595740/uioexfuepgqqovjzfskk.png"
       />
-      <Navbar />
-      <div className="flex justify-center mx-4">
-        <div className="w-full max-w-[1150px]">
-          <div className="flex gap-10 px-10 my-4 border-b">
-            <button
-              onClick={() => setCurrentTab(Tabs.accounts)}
-              className={`py-1 font-medium transition border-b-2 ${
-                currentTab === Tabs.accounts
-                  ? "border-black"
-                  : "text-gray-500 border-transparent"
-              } `}
-            >
-              Accounts
-            </button>
-            <button
-              onClick={() => setCurrentTab(Tabs.videos)}
-              className={`py-1 font-medium transition border-b-2 ${
-                currentTab === Tabs.videos
-                  ? "border-black"
-                  : "text-gray-500 border-transparent"
-              } `}
-            >
-              Videos
-            </button>
-          </div>
+      <div className="w-full px-4 pb-5">
+        <ul className="mt-1 flex w-full items-center justify-center border-b border-[#2f2f2f]">
+          <li
+            onClick={() => setSearchType("videos")}
+            className={`${
+              searchType === "videos"
+                ? "border-b border-white"
+                : "text-gray-500"
+            } cursor-pointer px-4 pb-4 pt-5 text-sm font-semibold`}
+          >
+            Videos
+          </li>
+          <li
+            onClick={() => setSearchType("accounts")}
+            className={`${
+              searchType === "accounts"
+                ? "border-b border-white"
+                : "text-gray-500"
+            } cursor-pointer px-4 pb-4 pt-5 text-sm font-semibold`}
+          >
+            Accounts
+          </li>
+        </ul>
 
-          {currentTab === Tabs.accounts ? (
-            <>
-              {accounts?.length === 0 ? (
-                <p className="text-center my-5">No result found</p>
-              ) : (
-                <div>
-                  {accounts?.map((account) => (
-                    <div
-                      className="flex gap-3 items-center px-3 py-2"
-                      key={account.id}
-                    >
-                      <Link href={`/user/${account.id}`}>
-                        <a>
-                          <Image
-                            src={account.image!}
-                            height={60}
-                            width={60}
-                            className="rounded-full object-cover"
-                            alt=""
-                          />
-                        </a>
-                      </Link>
-                      <Link href={`/user/${account.id}`}>
-                        <a>
-                          <h1 className="text-lg font-semibold">
-                            {formatAccountName(account?.name!)}
-                          </h1>
-                          <p className="text-sm text-gray-500">
-                            {account?.name} · {account._count.followers}{" "}
-                            Follower
-                            {account._count.followers > 1 ? "s" : ""}
-                          </p>
-                        </a>
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {videos?.length === 0 ? (
-                <p className="text-center my-5">No result found</p>
-              ) : (
-                <div className="grid gap-4 grid-cols-[repeat(auto-fill,_minmax(120px,_1fr))] lg:grid-cols-[repeat(auto-fill,_minmax(200px,_1fr))]">
-                  {videos?.map((video) => (
-                    <div key={video.id}>
-                      <Link href={`/video/${video.id}`}>
-                        <a className="block h-0 relative pb-[131%]">
-                          <img
-                            className="absolute inset-0 h-full w-full object-cover rounded"
-                            src={video.coverURL}
-                            alt=""
-                          />
-                          <BsPlay className="absolute left-3 bottom-3 fill-white w-7 h-7" />
-                        </a>
-                      </Link>
-                      <p className="whitespace-nowrap overflow-hidden text-ellipsis my-1">
-                        {video.caption}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <Link href={`/user/${video.user.id}`}>
-                          <a className="flex items-center gap-1">
-                            <Image
-                              src={video.user.image!}
-                              width={20}
-                              height={20}
-                              alt=""
-                              className="rounded-full object-cover"
-                            />
-                            <span>{formatAccountName(video.user.name!)}</span>
-                          </a>
-                        </Link>
-                        <BsPlay className="fill-black w-5 h-5" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        {searchType === "videos" ? (
+          <>
+            {videos?.length === 0 && (
+              <h3 className="mt-5 w-full text-center">
+                No videos found by keyword {`"${keyword}"`}
+              </h3>
+            )}
+            <div className="mt-5 grid grid-cols-3 gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {videos?.map((item) => (
+                <VideoSmall key={item?.id} video={item} />
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {accounts?.length === 0 && (
+              <h3 className="mt-5 w-full text-center">
+                No accounts found by keyword {`"${keyword}"`}
+              </h3>
+            )}
+            <div className="mt-5 grid grid-cols-3 gap-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+              {accounts?.map((account) => (
+                <AccountItem account={account} key={account?.id} />
+              ))}
+            </div>
+          </>
+        )}
       </div>
-    </>
+    </MainLayout>
   );
 };
 
-export default Search;
+export const getServerSideProps: GetServerSideProps = async (
+  context: GetServerSidePropsContext
+) => {
+  const keyword = context?.query?.keyword as string;
 
-type SearchProps = InferGetServerSidePropsType<typeof getServerSideProps>;
+  try {
+    const [videos, accounts] = await Promise.all([
+      prisma?.video?.findMany({
+        where: {
+          title: {
+            contains: keyword,
+          },
+        },
+      }),
+      prisma?.user?.findMany({
+        where: {
+          name: {
+            contains: keyword,
+          },
+        },
+        include: {
+          _count: {
+            select: {
+              followers: true,
+              followings: true,
+            },
+          },
+        },
+      }),
+    ]);
 
-export const getServerSideProps = async ({
-  req,
-  res,
-  query,
-}: GetServerSidePropsContext) => {
-  const q = query.q as string;
-
-  if (!q || typeof q !== "string") {
     return {
-      redirect: {
-        destination: "/",
-        permanent: true,
+      props: {
+        videos: JSON.parse(JSON.stringify(videos)),
+        accounts: JSON.parse(JSON.stringify(accounts)),
+        keyword,
       },
+    };
+  } catch (error) {
+    return {
       props: {},
+      notFound: true,
     };
   }
-
-  const session = await getServerSession(req, res, authOptions);
-
-  const [accounts, videos] = await Promise.all([
-    prisma.user.findMany({
-      where: {
-        OR: {
-          email: {
-            search: q,
-          },
-          name: {
-            search: q,
-          },
-        },
-      },
-      take: 20,
-      select: {
-        _count: {
-          select: {
-            followers: true,
-          },
-        },
-        id: true,
-        image: true,
-
-        name: true,
-      },
-    }),
-    prisma.video.findMany({
-      where: {
-        caption: {
-          search: q,
-        },
-      },
-      take: 20,
-      select: {
-        id: true,
-        coverURL: true,
-        caption: true,
-        user: {
-          select: {
-            id: true,
-            image: true,
-            name: true,
-          },
-        },
-      },
-    }),
-  ]);
-
-  return {
-    props: {
-      session,
-      videos,
-      accounts,
-    },
-  };
 };
+
+export default Search;
